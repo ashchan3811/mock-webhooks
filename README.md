@@ -12,6 +12,7 @@ This mock webhook service provides a flexible endpoint structure that accepts an
 - Simulate different HTTP status codes
 - Simulate response delays
 - View all requests in a clean, real-time dashboard
+- Generate placeholder SVG images for testing and development
 
 ## Webhook URL Structure
 
@@ -200,7 +201,35 @@ The webhook endpoint returns a JSON response with the following structure:
 
 ## Example Usage
 
-### cURL Example
+### Image Placeholder Examples
+
+**Basic placeholder (rectangle):**
+```html
+<img src="https://mock-webhooks.vercel.app/images/600x400" alt="Placeholder" />
+```
+
+**Square placeholder (single dimension):**
+```html
+<img src="https://mock-webhooks.vercel.app/images/600" alt="Square placeholder" />
+```
+
+**With custom colors (hex codes):**
+```html
+<img src="https://mock-webhooks.vercel.app/images/600x400?bg=FF0000&textColor=FFFFFF" alt="Red placeholder" />
+```
+
+**With custom colors (CSS color names):**
+```html
+<img src="https://mock-webhooks.vercel.app/images/600x400?bg=red&textColor=white" alt="Red placeholder" />
+<img src="https://mock-webhooks.vercel.app/images/600x400?bg=navy&textColor=yellow" alt="Navy placeholder" />
+```
+
+**With custom text:**
+```html
+<img src="https://mock-webhooks.vercel.app/images/600x400?text=Custom+Text" alt="Custom placeholder" />
+```
+
+### Webhook cURL Example
 
 ```bash
 curl -X POST https://mock-webhooks.vercel.app/webhooks/workorder \
@@ -303,6 +332,48 @@ Clears all webhook logs.
 DELETE /api/logs/{id}
 ```
 Deletes a specific webhook log by ID.
+
+### Image Placeholder API
+```
+GET /images/{WIDTH}x{HEIGHT}
+GET /images/{SIZE}
+```
+Generates a placeholder SVG image with the specified dimensions.
+
+**Format:**
+- `WIDTHxHEIGHT` - Rectangular image (e.g., `600x400`)
+- `SIZE` - Square image (e.g., `600` creates a 600x600 image)
+
+**Examples:**
+```
+GET /images/600x400    # 600x400 rectangle
+GET /images/800x600    # 800x600 rectangle
+GET /images/200        # 200x200 square
+GET /images/500        # 500x500 square
+```
+
+**Query Parameters:**
+- `bg` - Background color (hex code or CSS color name, with or without #). Default: `DDDDDD`
+- `textColor` - Text color (hex code or CSS color name, with or without #). Default: `999999`
+- `text` - Custom text to display. Default: `{WIDTH}x{HEIGHT}` or `{SIZE}` for squares
+
+**Color Formats Supported:**
+- Hex codes: `FF0000`, `#FF0000`, `#F00` (3-digit shorthand)
+- CSS color names: `red`, `blue`, `green`, `yellow`, `orange`, `purple`, etc.
+
+**Examples with query parameters:**
+```
+GET /images/600x400?bg=FF0000&textColor=FFFFFF
+GET /images/600x400?bg=red&textColor=white
+GET /images/600x400?bg=#336699&textColor=#FFFFFF
+GET /images/600x400?bg=navy&textColor=yellow&text=Placeholder
+GET /images/600x400?bg=darkblue&textColor=lightblue
+```
+
+**Response:**
+- Content-Type: `image/svg+xml`
+- Returns an SVG image with the specified dimensions
+- Dimensions must be between 1 and 10,000 pixels
 
 ## Development
 
