@@ -90,10 +90,12 @@ async function handleWebhook(
       console.log(`Wait completed`);
     }
 
-    // Get headers
+    // Get headers (excluding x-vercel headers)
     const headers: Record<string, string> = {};
     request.headers.forEach((value, key) => {
-      headers[key] = value;
+      if (!key.toLowerCase().startsWith("x-vercel")) {
+        headers[key] = value;
+      }
     });
 
     // Get body based on content type
