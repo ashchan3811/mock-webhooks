@@ -74,6 +74,31 @@ export default function LogsPage() {
     alert("Copied to clipboard!");
   };
 
+  const getWebhookUrl = () => {
+    if (typeof window !== "undefined") {
+      const baseUrl = window.location.origin;
+      return `${baseUrl}/webhooks/test`;
+    }
+    return "";
+  };
+
+  const getCurlCommand = () => {
+    const url = getWebhookUrl();
+    return `curl -X POST ${url} \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "eventId": "example-event-id",
+    "eventType": "UPDATED",
+    "entityType": "WORKORDER",
+    "entityId": "EXAMPLE123"
+  }'`;
+  };
+
+  const copyCurlCommand = () => {
+    const curlCommand = getCurlCommand();
+    copyToClipboard(curlCommand);
+  };
+
   useEffect(() => {
     fetchLogs();
     
@@ -208,9 +233,27 @@ export default function LogsPage() {
             <p className="text-slate-500 mb-4">
               Send a request to any endpoint to see it appear here
             </p>
-            <code className="bg-slate-100 px-3 py-1 rounded text-sm text-slate-700">
-              POST /webhooks/test
-            </code>
+            <div className="flex flex-col items-center gap-3">
+              <code className="bg-slate-100 px-3 py-1 rounded text-sm text-slate-700">
+                POST /webhooks/test
+              </code>
+              <button
+                onClick={copyCurlCommand}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm cursor-pointer"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="5" y="5" width="9" height="9" rx="1" />
+                  <path d="M3 3v9h9" />
+                </svg>
+                Copy cURL Command
+              </button>
+              <div className="mt-2 text-left max-w-2xl w-full">
+                <p className="text-xs text-slate-500 mb-2">Example cURL command:</p>
+                <pre className="bg-slate-900 text-slate-100 p-3 rounded text-xs overflow-x-auto border border-slate-700">
+                  {getCurlCommand()}
+                </pre>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -366,7 +409,7 @@ export default function LogsPage() {
                           </h3>
                           <button
                             onClick={() => copyToClipboard(JSON.stringify(selectedLog.queryParams, null, 2))}
-                            className="text-xs text-blue-600 hover:text-blue-700"
+                            className="text-xs text-blue-600 hover:text-blue-700 cursor-pointer"
                           >
                             Copy
                           </button>
@@ -386,7 +429,7 @@ export default function LogsPage() {
                           </h3>
                           <button
                             onClick={() => copyToClipboard(JSON.stringify(selectedLog.headers, null, 2))}
-                            className="text-xs text-blue-600 hover:text-blue-700"
+                            className="text-xs text-blue-600 hover:text-blue-700 cursor-pointer"
                           >
                             Copy
                           </button>
@@ -413,7 +456,7 @@ export default function LogsPage() {
                                 : JSON.stringify(selectedLog.body, null, 2)
                             )
                           }
-                          className="text-xs text-blue-600 hover:text-blue-700"
+                          className="text-xs text-blue-600 hover:text-blue-700 cursor-pointer"
                         >
                           Copy
                         </button>
