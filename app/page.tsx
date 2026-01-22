@@ -61,10 +61,16 @@ export default function LogsPage() {
 
   useEffect(() => {
     fetchLogs();
-    if (autoRefresh) {
-      const interval = setInterval(fetchLogs, 2000);
-      return () => clearInterval(interval);
+    
+    if (!autoRefresh) {
+      return;
     }
+
+    const interval = setInterval(() => {
+      fetchLogs();
+    }, 2000);
+
+    return () => clearInterval(interval);
   }, [autoRefresh, fetchLogs]);
 
   const getStatusColor = (statusCode: number) => {
@@ -195,17 +201,17 @@ export default function LogsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Logs List */}
             <div className="bg-white rounded-lg shadow-sm border border-slate-200">
-              <div className="p-4 border-b border-slate-200 bg-slate-50">
-                <h2 className="text-lg font-semibold text-slate-900">
+              <div className="px-2 py-1.5 border-b border-slate-200 bg-slate-50">
+                <h2 className="text-sm font-semibold text-slate-900">
                   Requests
-                  <span className="ml-2 text-sm font-normal text-slate-500">
+                  <span className="ml-1.5 text-xs font-normal text-slate-500">
                     ({filteredLogs.length} {filteredLogs.length !== logs.length && `of ${logs.length}`})
                   </span>
                 </h2>
               </div>
-              <div className="max-h-[calc(100vh-250px)] overflow-y-auto">
+              <div className="max-h-[calc(100vh-200px)] overflow-y-auto">
                 {filteredLogs.length === 0 ? (
-                  <div className="p-8 text-center text-slate-500">
+                  <div className="p-4 text-center text-slate-500 text-xs">
                     No requests match your search
                   </div>
                 ) : (
@@ -214,39 +220,39 @@ export default function LogsPage() {
                       <div
                         key={log.id}
                         onClick={() => setSelectedLog(log)}
-                        className={`p-4 cursor-pointer transition ${
+                        className={`px-2 py-1.5 cursor-pointer transition ${
                           selectedLog?.id === log.id
-                            ? "bg-blue-50 border-l-4 border-blue-500"
+                            ? "bg-blue-50 border-l-2 border-blue-500"
                             : "hover:bg-slate-50"
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start justify-between gap-1.5">
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2">
+                            <div className="flex items-center gap-1 mb-0.5">
                               <span
-                                className={`px-2 py-0.5 rounded text-xs font-bold text-white ${getMethodColor(
+                                className={`px-1 py-0.5 rounded text-xs font-bold text-white ${getMethodColor(
                                   log.method
                                 )}`}
                               >
                                 {log.method}
                               </span>
                               <span
-                                className={`px-2 py-0.5 rounded text-xs font-semibold border ${getStatusColor(
+                                className={`px-1 py-0.5 rounded text-xs font-semibold border ${getStatusColor(
                                   log.statusCode
                                 )}`}
                               >
                                 {log.statusCode}
                               </span>
                               {log.timeout && (
-                                <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
+                                <span className="px-1 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
                                   ⏱ {log.timeout}s
                                 </span>
                               )}
                             </div>
-                            <div className="text-sm font-mono text-slate-700 truncate mb-1">
+                            <div className="text-xs font-mono text-slate-700 truncate mb-0">
                               {log.path}
                             </div>
-                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <div className="flex items-center gap-1 text-xs text-slate-500">
                               <span>{formatRelativeTime(log.timestamp)}</span>
                               <span>•</span>
                               <span>{formatTimestamp(log.timestamp)}</span>
