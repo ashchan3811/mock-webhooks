@@ -5,14 +5,7 @@ export async function GET(
   { params }: { params: Promise<{ slug?: string[] }> },
 ) {
   const { slug } = await params;
-  const path = slug && slug.length > 0 ? `/${slug.join("/")}` : "/";
-  
-  return NextResponse.json({ 
-    message: "Webhook endpoint is ready!",
-    path,
-    methods: ["POST", "PUT", "PATCH", "DELETE"],
-    usage: "Send webhook requests to this endpoint"
-  });
+  return handleWebhook(request, "GET", slug);
 }
 
 export async function POST(
@@ -56,17 +49,48 @@ async function handleWebhook(
     // Get the path from slug
     const path = slug && slug.length > 0 ? `/${slug.join("/")}` : "/";
 
-    // Get headers
-    const headers: Record<string, string> = {};
-    request.headers.forEach((value, key) => {
-      headers[key] = value;
-    });
-
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
     const queryParams: Record<string, string> = {};
     searchParams.forEach((value, key) => {
       queryParams[key] = value;
+    });
+
+    // Parse statusCode and timeout from query params
+    const statusCodeParam = searchParams.get("statusCode");
+    const timeoutParam = searchParams.get("timeout");
+    
+    const statusCode = statusCodeParam ? parseInt(statusCodeParam, 10) : 200;
+    const timeoutSeconds = timeoutParam ? parseInt(timeoutParam, 10) : 0;
+
+    // Validate status code (must be between 100 and 599)
+    const validStatusCode = statusCode >= 100 && statusCode <= 599 ? statusCode : 200;
+    
+    // Validate timeout in seconds (must be non-negative, cap at reasonable limit like 300 seconds = 5 minutes)
+    const validTimeoutSeconds = timeoutSeconds >= 0 && timeoutSeconds <= 300 ? timeoutSeconds : 0;
+    
+    // Convert seconds to milliseconds for setTimeout
+    const validTimeoutMs = validTimeoutSeconds * 1000;
+
+    // Track start and end time for timeout
+    let startTime: string | undefined;
+    let endTime: string | undefined;
+
+    // Wait for the specified timeout (timeout is in seconds, converted to milliseconds)
+    if (validTimeoutMs > 0) {
+      startTime = new Date().toISOString();
+      console.log(`Waiting ${validTimeoutSeconds} seconds (${validTimeoutMs}ms) before responding...`);
+      console.log(`Start time: ${startTime}`);
+      await new Promise((resolve) => setTimeout(resolve, validTimeoutMs));
+      endTime = new Date().toISOString();
+      console.log(`End time: ${endTime}`);
+      console.log(`Wait completed`);
+    }
+
+    // Get headers
+    const headers: Record<string, string> = {};
+    request.headers.forEach((value, key) => {
+      headers[key] = value;
     });
 
     // Get body based on content type
@@ -106,24 +130,33 @@ async function handleWebhook(
     console.log("Path:", path);
     console.log("Method:", method);
     console.log("URL:", request.url);
+    console.log("Status Code:", validStatusCode);
+    console.log("Timeout (seconds):", validTimeoutSeconds);
     console.log("Headers:", headers);
     console.log("Query Params:", queryParams);
     console.log("Body:", body);
     console.log("=======================");
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: "Webhook received successfully",
-        path,
-        method,
-        timestamp: new Date().toISOString(),
-        data: {
-          body,
-        },
+    const response: any = {
+      success: true,
+      message: "Webhook received successfully",
+      path,
+      method,
+      statusCode: validStatusCode,
+      timeout: validTimeoutSeconds,
+      timestamp: new Date().toISOString(),
+      data: {
+        body,
       },
-      { status: 200 }
-    );
+    };
+
+    // Add startTime and endTime if timeout was used
+    if (validTimeoutSeconds > 0 && startTime && endTime) {
+      response.startTime = startTime;
+      response.endTime = endTime;
+    }
+
+    return NextResponse.json(response, { status: validStatusCode });
   } catch (error) {
     console.error("Error processing webhook:", error);
     return NextResponse.json(
