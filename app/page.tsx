@@ -124,7 +124,7 @@ export default function LogsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100">
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mb-6">
@@ -188,7 +188,7 @@ export default function LogsPage() {
               Send a request to any endpoint to see it appear here
             </p>
             <code className="bg-slate-100 px-3 py-1 rounded text-sm text-slate-700">
-              POST /webhook/test
+              POST /webhooks/test
             </code>
           </div>
         ) : (
