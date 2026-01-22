@@ -15,10 +15,11 @@ This mock webhook service provides a flexible endpoint structure that accepts an
 
 ## Webhook URL Structure
 
-All webhook URLs follow this pattern:
+The service uses a catch-all route that accepts any path after `/webhooks/`. You can use any path structure you need.
 
+**Base URL Pattern:**
 ```
-https://mock-webhooks.vercel.app/webhooks/{your-path}
+https://mock-webhooks.vercel.app/webhooks/{any-path}
 ```
 
 ### Examples
@@ -28,9 +29,16 @@ https://mock-webhooks.vercel.app/webhooks/{your-path}
 https://mock-webhooks.vercel.app/webhooks/workorder
 ```
 
-**Nested path:**
+**Nested path (multiple levels):**
 ```
 https://mock-webhooks.vercel.app/webhooks/sr/create
+https://mock-webhooks.vercel.app/webhooks/workorder/update/123
+https://mock-webhooks.vercel.app/webhooks/api/v1/events
+```
+
+**Root webhook path (no additional path):**
+```
+https://mock-webhooks.vercel.app/webhooks
 ```
 
 **With query parameters:**
@@ -55,6 +63,8 @@ https://mock-webhooks.vercel.app/webhooks/sr/create?statusCode=529
 
 **Supported range:** `100-599`
 
+**Validation:** If an invalid status code is provided (outside 100-599), it defaults to `200`.
+
 ### 2. Response Delays (Timeout)
 
 Simulate slow responses or network delays using the `timeout` query parameter:
@@ -65,7 +75,9 @@ https://mock-webhooks.vercel.app/webhooks/sr/create?timeout=20
 
 - **Parameter:** `timeout` (in seconds)
 - **Range:** `0-300` seconds (5 minutes max)
-- **Note:** Actual delay may vary by ±5 seconds due to server processing time
+- **Default:** `0` (no delay)
+- **Validation:** If timeout is negative or exceeds 300 seconds, it defaults to `0`
+- **Note:** The timeout is applied before sending the response. The server will wait for the specified duration, then respond with the configured status code.
 
 ### 3. Combined Parameters
 
@@ -97,16 +109,94 @@ All standard HTTP methods are supported:
 - `PATCH`
 - `DELETE`
 
+## Request Body Handling
+
+The service automatically parses request bodies based on the `Content-Type` header:
+
+| Content-Type | Parsing Behavior |
+|--------------|------------------|
+| `application/json` | Parsed as JSON object |
+| `application/x-www-form-urlencoded` | Parsed as key-value object |
+| `multipart/form-data` | Parsed as key-value object |
+| Other types | Stored as raw text string |
+| No body / `null` | Stored as `null` |
+
+**Examples:**
+
+**JSON Body:**
+```bash
+curl -X POST https://mock-webhooks.vercel.app/webhooks/test \
+  -H "Content-Type: application/json" \
+  -d '{"key": "value"}'
+```
+
+**Form Data:**
+```bash
+curl -X POST https://mock-webhooks.vercel.app/webhooks/test \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "key=value&another=param"
+```
+
+**Raw Text:**
+```bash
+curl -X POST https://mock-webhooks.vercel.app/webhooks/test \
+  -H "Content-Type: text/plain" \
+  -d "raw text content"
+```
+
 ## Request Inspection
 
 Each webhook request is logged with:
-- **Method** - HTTP method used
-- **Path** - Endpoint path
-- **Status Code** - Response status code
-- **Headers** - All request headers (x-vercel headers are filtered out)
-- **Query Parameters** - URL query parameters
-- **Body** - Request body (JSON, form data, or raw text)
-- **Timestamp** - When the request was received
+- **Method** - HTTP method used (GET, POST, PUT, PATCH, DELETE)
+- **Path** - Endpoint path (e.g., `/webhooks/workorder`)
+- **URL** - Full request URL including query parameters
+- **Status Code** - Response status code returned
+- **Headers** - All request headers (x-vercel headers are automatically filtered out)
+- **Query Parameters** - All URL query parameters (including `statusCode` and `timeout` if used)
+- **Body** - Request body parsed based on Content-Type:
+  - `application/json` → Parsed as JSON object
+  - `application/x-www-form-urlencoded` → Parsed as key-value object
+  - `multipart/form-data` → Parsed as key-value object
+  - Other content types → Stored as raw text
+- **Timestamp** - ISO timestamp when the request was received
+- **Timeout** - If timeout was used, shows the delay duration and start/end times
+
+## Response Format
+
+The webhook endpoint returns a JSON response with the following structure:
+
+```json
+{
+  "success": true,
+  "message": "Webhook received successfully",
+  "path": "/webhooks/workorder",
+  "method": "POST",
+  "statusCode": 200,
+  "timeout": 0,
+  "timestamp": "2024-01-20T15:15:58.526Z",
+  "data": {
+    "body": { /* your request body */ }
+  }
+}
+```
+
+**If timeout was used, additional fields are included:**
+```json
+{
+  "success": true,
+  "message": "Webhook received successfully",
+  "path": "/webhooks/workorder",
+  "method": "POST",
+  "statusCode": 200,
+  "timeout": 20,
+  "timestamp": "2024-01-20T15:15:58.526Z",
+  "startTime": "2024-01-20T15:15:58.526Z",
+  "endTime": "2024-01-20T15:16:18.530Z",
+  "data": {
+    "body": { /* your request body */ }
+  }
+}
+```
 
 ## Example Usage
 
@@ -164,9 +254,16 @@ print(response.status_code)
 **This service does not use a database.** All webhook logs are stored in memory only. This means:
 
 - ✅ Requests are visible immediately after being sent
+- ✅ Up to 1,000 most recent requests are kept (oldest are automatically removed)
+- ✅ Requests are stored newest-first for easy access
 - ❌ Requests are lost when the server restarts
 - ❌ Old requests cannot be retrieved after a restart
 - ✅ You can always send new requests after a restart
+
+**Storage Limits:**
+- Maximum of 1,000 logs stored at any time
+- When the limit is reached, oldest logs are automatically removed
+- Each log includes a unique ID for reference
 
 ### 🔒 Headers Filtering
 
@@ -179,9 +276,17 @@ This helps keep the logs clean and focused on your actual webhook data.
 
 ### Webhook Endpoint
 ```
-POST/GET/PUT/PATCH/DELETE /webhooks/{...path}
+GET/POST/PUT/PATCH/DELETE /webhooks/{...path}
 ```
-Accepts any path and logs the request.
+
+**Route Pattern:** Catch-all route `[[...slug]]` that accepts any path structure.
+
+**Behavior:**
+- Accepts any path after `/webhooks/` (e.g., `/webhooks/workorder`, `/webhooks/sr/create`)
+- If no path is provided, defaults to `/webhooks`
+- Logs the request with all details
+- Returns JSON response with request information
+- Supports query parameters for `statusCode` and `timeout`
 
 ### Logs API
 ```
@@ -243,13 +348,17 @@ Deletes a specific webhook log by ID.
 - Refresh the dashboard or wait for auto-refresh
 
 ### Timeout not working as expected
-- Timeout accuracy is ±5 seconds due to server processing
 - Maximum timeout is 300 seconds (5 minutes)
-- Very short timeouts (< 1 second) may not be accurate
+- Timeout value must be between 0-300 seconds
+- Invalid timeout values default to 0 (no delay)
+- The timeout is applied server-side before the response is sent
+- For very short timeouts, actual delay may vary slightly due to server processing overhead
 
 ### Status code not working
 - Ensure status code is between 100-599
 - Check that the query parameter is correctly formatted: `?statusCode=400`
+- Invalid status codes (outside 100-599) will default to `200`
+- Status code must be a valid integer
 
 ## Support
 
