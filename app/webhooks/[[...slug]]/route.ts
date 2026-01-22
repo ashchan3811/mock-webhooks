@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { addWebhookLog } from "@/lib/store";
 
 export async function GET(
   request: NextRequest,
@@ -46,8 +47,10 @@ async function handleWebhook(
   slug?: string[],
 ) {
   try {
-    // Get the path from slug
-    const path = slug && slug.length > 0 ? `/${slug.join("/")}` : "/";
+    // Get the path from slug, prepend /webhooks
+    const path = slug && slug.length > 0 
+      ? `/webhooks/${slug.join("/")}` 
+      : "/webhooks";
 
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
@@ -125,6 +128,8 @@ async function handleWebhook(
       }
     }
 
+    const timestamp = new Date().toISOString();
+
     // Log webhook data (in production, you might want to save this to a database)
     console.log("=== Webhook Received ===");
     console.log("Path:", path);
@@ -137,6 +142,23 @@ async function handleWebhook(
     console.log("Body:", body);
     console.log("=======================");
 
+    // Save webhook log
+    const logId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    addWebhookLog({
+      id: logId,
+      timestamp,
+      method,
+      path,
+      url: request.url,
+      statusCode: validStatusCode,
+      timeout: validTimeoutSeconds > 0 ? validTimeoutSeconds : undefined,
+      startTime,
+      endTime,
+      headers,
+      queryParams,
+      body,
+    });
+
     const response: any = {
       success: true,
       message: "Webhook received successfully",
@@ -144,7 +166,7 @@ async function handleWebhook(
       method,
       statusCode: validStatusCode,
       timeout: validTimeoutSeconds,
-      timestamp: new Date().toISOString(),
+      timestamp,
       data: {
         body,
       },
