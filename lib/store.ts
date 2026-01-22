@@ -38,3 +38,12 @@ export function clearWebhookLogs(): void {
 export function getWebhookLogById(id: string): WebhookLog | undefined {
   return webhookLogs.find(log => log.id === id);
 }
+
+export function deleteWebhookLog(id: string): boolean {
+  const index = webhookLogs.findIndex(log => log.id === id);
+  if (index !== -1) {
+    webhookLogs.splice(index, 1);
+    return true;
+  }
+  return false;
+}

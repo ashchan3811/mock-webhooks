@@ -54,6 +54,21 @@ export default function LogsPage() {
     }
   };
 
+  const deleteLog = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent row selection when clicking delete
+    if (confirm("Are you sure you want to delete this log?")) {
+      try {
+        await fetch(`/api/logs/${id}`, { method: "DELETE" });
+        setLogs((prev) => prev.filter((log) => log.id !== id));
+        if (selectedLog?.id === id) {
+          setSelectedLog(null);
+        }
+      } catch (error) {
+        console.error("Error deleting log:", error);
+      }
+    }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     alert("Copied to clipboard!");
@@ -131,7 +146,7 @@ export default function LogsPage() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100">
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-8xl mx-auto p-6">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mb-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -144,7 +159,7 @@ export default function LogsPage() {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setAutoRefresh(!autoRefresh)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer ${
                   autoRefresh
                     ? "bg-green-100 text-green-700 hover:bg-green-200"
                     : "bg-slate-100 text-slate-700 hover:bg-slate-200"
@@ -154,13 +169,13 @@ export default function LogsPage() {
               </button>
               <button
                 onClick={fetchLogs}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm cursor-pointer"
               >
                 ↻ Refresh
               </button>
               <button
                 onClick={clearLogs}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium text-sm"
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium text-sm cursor-pointer"
               >
                 🗑 Clear All
               </button>
@@ -252,12 +267,21 @@ export default function LogsPage() {
                             <div className="text-xs font-mono text-slate-700 truncate mb-0">
                               {log.path}
                             </div>
-                            <div className="flex items-center gap-1 text-xs text-slate-500">
+                            <div className="flex items-center gap-1 text-[10px] text-slate-500">
                               <span>{formatRelativeTime(log.timestamp)}</span>
                               <span>•</span>
                               <span>{formatTimestamp(log.timestamp)}</span>
                             </div>
                           </div>
+                          <button
+                            onClick={(e) => deleteLog(log.id, e)}
+                            className="text-gray-400 hover:text-red-500 transition shrink-0 ml-1 cursor-pointer"
+                            title="Delete"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                              <path d="M5.5 4.5h-1a1 1 0 00-1 1v8a1 1 0 001 1h7a1 1 0 001-1v-8a1 1 0 00-1-1h-1M5.5 4.5V3a1 1 0 011-1h3a1 1 0 011 1v1.5M5.5 4.5h5M6.5 7.5v4M9.5 7.5v4" />
+                            </svg>
+                          </button>
                         </div>
                       </div>
                     ))}
