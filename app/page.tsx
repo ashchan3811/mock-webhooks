@@ -43,6 +43,12 @@ export default function LogsPage() {
         ? `/api/logs?paginate=true&page=${currentPage}&pageSize=${pageSize}`
         : "/api/logs";
       const response = await fetch(url);
+      if (!response.ok) {
+        if (response.status === 401) {
+          alert("Authentication required. Please configure API keys in environment variables.");
+        }
+        return;
+      }
       const data = await response.json();
       
       if (usePagination && data.logs) {
@@ -77,11 +83,20 @@ export default function LogsPage() {
   const clearLogs = async () => {
     if (confirm("Are you sure you want to clear all logs?")) {
       try {
-        await fetch("/api/logs", { method: "DELETE" });
+        const response = await fetch("/api/logs", { method: "DELETE" });
+        if (!response.ok) {
+          if (response.status === 401) {
+            alert("Authentication required. Please configure API keys.");
+          } else {
+            alert("Failed to clear logs");
+          }
+          return;
+        }
         setLogs([]);
         setSelectedLog(null);
       } catch (error) {
         console.error("Error clearing logs:", error);
+        alert("Error clearing logs");
       }
     }
   };
@@ -90,13 +105,22 @@ export default function LogsPage() {
     e.stopPropagation(); // Prevent row selection when clicking delete
     if (confirm("Are you sure you want to delete this log?")) {
       try {
-        await fetch(`/api/logs/${id}`, { method: "DELETE" });
+        const response = await fetch(`/api/logs/${id}`, { method: "DELETE" });
+        if (!response.ok) {
+          if (response.status === 401) {
+            alert("Authentication required. Please configure API keys.");
+          } else {
+            alert("Failed to delete log");
+          }
+          return;
+        }
         setLogs((prev) => prev.filter((log) => log.id !== id));
         if (selectedLog?.id === id) {
           setSelectedLog(null);
         }
       } catch (error) {
         console.error("Error deleting log:", error);
+        alert("Error deleting log");
       }
     }
   };
@@ -208,8 +232,16 @@ export default function LogsPage() {
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mb-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-slate-900 mb-1">Webhook Logs</h1>
-              <p className="text-sm text-slate-500">
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-slate-900">Webhook Logs</h1>
+                <a
+                  href="/analytics"
+                  className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                >
+                  📊 Analytics
+                </a>
+              </div>
+              <p className="text-sm text-slate-500 mt-1">
                 Monitor all incoming webhook requests in real-time
               </p>
             </div>
@@ -557,20 +589,47 @@ export default function LogsPage() {
                         <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
                           Request Body
                         </h3>
-                        <button
-                          onClick={() =>
-                            copyToClipboard(
-                              selectedLog.body === null
-                                ? "null"
-                                : typeof selectedLog.body === "string"
-                                ? selectedLog.body
-                                : JSON.stringify(selectedLog.body, null, 2)
-                            )
-                          }
-                          className="text-xs text-blue-600 hover:text-blue-700 cursor-pointer"
-                        >
-                          Copy
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              try {
+                                const response = await fetch("/api/test", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({
+                                    action: "replay",
+                                    logId: selectedLog.id,
+                                  }),
+                                });
+                                const data = await response.json();
+                                if (data.success) {
+                                  alert(`Replay successful! Status: ${data.replay.status}`);
+                                } else {
+                                  alert(`Replay failed: ${data.error}`);
+                                }
+                              } catch (error) {
+                                alert("Failed to replay webhook");
+                              }
+                            }}
+                            className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 cursor-pointer"
+                          >
+                            🔄 Replay
+                          </button>
+                          <button
+                            onClick={() =>
+                              copyToClipboard(
+                                selectedLog.body === null
+                                  ? "null"
+                                  : typeof selectedLog.body === "string"
+                                  ? selectedLog.body
+                                  : JSON.stringify(selectedLog.body, null, 2)
+                              )
+                            }
+                            className="text-xs text-blue-600 hover:text-blue-700 cursor-pointer"
+                          >
+                            Copy
+                          </button>
+                        </div>
                       </div>
                       <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg text-xs overflow-x-auto border border-slate-700 min-h-[100px]">
                         {selectedLog.body === null

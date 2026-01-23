@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWebhookLogs, getWebhookLogsPaginated, clearWebhookLogs } from "@/lib/store";
+import { validateApiKey, getAuthErrorResponse } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
+  // Authentication check
+  if (!validateApiKey(request)) {
+    return NextResponse.json(getAuthErrorResponse(), { status: 401 });
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const pageParam = searchParams.get("page");
   const pageSizeParam = searchParams.get("pageSize");
@@ -21,16 +27,21 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const result = getWebhookLogsPaginated(page, pageSize);
+    const result = await getWebhookLogsPaginated(page, pageSize);
     return NextResponse.json(result);
   }
 
   // Default: return all logs (for backward compatibility)
-  const logs = getWebhookLogs();
+  const logs = await getWebhookLogs();
   return NextResponse.json({ logs });
 }
 
-export async function DELETE() {
-  clearWebhookLogs();
+export async function DELETE(request: NextRequest) {
+  // Authentication check
+  if (!validateApiKey(request)) {
+    return NextResponse.json(getAuthErrorResponse(), { status: 401 });
+  }
+
+  await clearWebhookLogs();
   return NextResponse.json({ message: "Logs cleared successfully" });
 }

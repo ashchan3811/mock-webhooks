@@ -469,6 +469,33 @@ The service includes several performance optimizations:
 
 For detailed performance information, see [PERFORMANCE.md](./PERFORMANCE.md).
 
+## New Features
+
+### 🔐 Authentication
+Optional API key authentication for production use. See [FEATURES.md](./FEATURES.md#2-authentication) for details.
+
+### 📊 Analytics Dashboard
+Comprehensive analytics dashboard at `/analytics` showing:
+- Request statistics and trends
+- Status code and method distributions
+- Top webhook paths
+- Real-time activity metrics
+
+### 🧪 Testing & Validation Tools
+Webhook testing tools including:
+- **Replay:** Replay logged webhooks to test endpoints
+- **Validate:** JSON schema validation
+- **Compare:** Compare two webhook logs
+
+For complete feature documentation, see [FEATURES.md](./FEATURES.md).
+
+### 💾 Storage Abstraction
+Storage layer abstraction supporting:
+- In-memory storage (default)
+- Ready for database integration (PostgreSQL, MongoDB, etc.)
+
+See [FEATURES.md](./FEATURES.md#1-persistent-storage-optional-database) for details.
+
 ## Support
 
 For issues or questions, please contact the development team or create an issue in the repository.

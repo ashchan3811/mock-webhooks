@@ -10,6 +10,7 @@ import {
   getContentLength,
   SECURITY_CONFIG,
 } from "@/lib/security";
+import { validateApiKey, getAuthErrorResponse } from "@/lib/auth";
 
 export async function GET(
   request: NextRequest,
@@ -57,6 +58,11 @@ async function handleWebhook(
   slug?: string[],
 ) {
   try {
+    // Authentication check
+    if (!validateApiKey(request)) {
+      return NextResponse.json(getAuthErrorResponse(), { status: 401 });
+    }
+
     // Rate limiting check
     const clientIP = getClientIP(request);
     const rateLimitResult = checkRateLimit(clientIP);
@@ -234,7 +240,7 @@ async function handleWebhook(
 
     // Save webhook log
     const logId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    addWebhookLog({
+    await addWebhookLog({
       id: logId,
       timestamp,
       method,
