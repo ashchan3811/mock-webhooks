@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { escapeXml, sanitizeColor, sanitizeText } from "@/lib/xss";
 
 // CSS color names to hex mapping
 const cssColorNames: Record<string, string> = {
@@ -182,10 +183,10 @@ export async function GET(
     );
   }
 
-  const bgColor = (request.nextUrl.searchParams.get("bg") || "DDDDDD").trim();
-  const textColor = (request.nextUrl.searchParams.get("textColor") || "999999").trim();
+  const bgColorParam = request.nextUrl.searchParams.get("bg") || "DDDDDD";
+  const textColorParam = request.nextUrl.searchParams.get("textColor") || "999999";
   const defaultText = width === height ? `${width}` : `${width}x${height}`;
-  const text = (request.nextUrl.searchParams.get("text") || defaultText).trim();
+  const textParam = request.nextUrl.searchParams.get("text") || defaultText;
 
   // Validate dimensions
   if (width <= 0 || width > 10000 || height <= 0 || height > 10000) {
@@ -195,30 +196,10 @@ export async function GET(
     );
   }
 
-  // Normalize color format (handle hex codes and color names)
-  const normalizeColor = (color: string) => {
-    if (!color) return "#999999"; // Default fallback
-    
-    // Trim whitespace
-    color = color.trim();
-    
-    // Check if it's already a hex color with #
-    if (color.startsWith("#")) return color;
-    
-    // Check if it's a CSS color name (case-insensitive)
-    const colorNameLower = color.toLowerCase();
-    if (cssColorNames[colorNameLower]) {
-      return cssColorNames[colorNameLower];
-    }
-    
-    // Assume it's a hex code without #
-    return `#${color}`;
-  };
-
-  const bgColorNormalized = normalizeColor(bgColor);
-  const textColorNormalized = normalizeColor(textColor);
-
-  console.log(bgColorNormalized, textColorNormalized, text);
+  // Sanitize colors and text to prevent XSS
+  const bgColorNormalized = sanitizeColor(bgColorParam, cssColorNames);
+  const textColorNormalized = sanitizeColor(textColorParam, cssColorNames);
+  const text = sanitizeText(textParam, 100); // Limit text to 100 characters
 
   // Generate SVG placeholder
   const svg = generatePlaceholderSVG(width, height, bgColorNormalized, textColorNormalized, text);
@@ -262,11 +243,3 @@ function generatePlaceholderSVG(
 </svg>`;
 }
 
-function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}

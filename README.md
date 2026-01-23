@@ -75,10 +75,11 @@ https://mock-webhooks.vercel.app/webhooks/sr/create?timeout=20
 ```
 
 - **Parameter:** `timeout` (in seconds)
-- **Range:** `0-300` seconds (5 minutes max)
+- **Range:** `0-60` seconds (1 minute max, reduced for security)
 - **Default:** `0` (no delay)
-- **Validation:** If timeout is negative or exceeds 300 seconds, it defaults to `0`
+- **Validation:** If timeout is negative or exceeds 60 seconds, it defaults to `0`
 - **Note:** The timeout is applied before sending the response. The server will wait for the specified duration, then respond with the configured status code.
+- **Security:** Maximum of 10 concurrent requests with timeouts allowed to prevent resource exhaustion
 
 ### 3. Combined Parameters
 
@@ -300,6 +301,32 @@ The following headers are automatically filtered out and not stored:
 - All headers starting with `x-vercel` (case-insensitive)
 
 This helps keep the logs clean and focused on your actual webhook data.
+
+### 🛡️ Security Features
+
+The service includes several security measures to prevent abuse:
+
+**Rate Limiting:**
+- Default: 100 requests per minute per IP address
+- Returns HTTP 429 (Too Many Requests) when limit is exceeded
+- Configurable via environment variables (see `SECURITY.md`)
+
+**Payload Size Limits:**
+- Maximum payload size: 10MB (configurable)
+- Returns HTTP 413 (Payload Too Large) when exceeded
+- Separate limits for JSON, text, and form data
+
+**Timeout Protection:**
+- Maximum timeout reduced to 60 seconds (from 300)
+- Limits concurrent requests with timeouts (default: 10)
+- Prevents resource exhaustion from timeout abuse
+
+**XSS Protection:**
+- All user input in SVG placeholders is sanitized
+- Text input is escaped and length-limited
+- Color values are validated against whitelist
+
+For detailed security information, see [SECURITY.md](./SECURITY.md).
 
 ## API Endpoints
 
