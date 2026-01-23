@@ -31,6 +31,40 @@ export function getWebhookLogs(): WebhookLog[] {
   return webhookLogs;
 }
 
+/**
+ * Get paginated webhook logs
+ * @param page - Page number (1-indexed)
+ * @param pageSize - Number of logs per page
+ * @returns Object with logs, total count, and pagination metadata
+ */
+export function getWebhookLogsPaginated(
+  page: number = 1,
+  pageSize: number = 50
+): {
+  logs: WebhookLog[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasMore: boolean;
+} {
+  const total = webhookLogs.length;
+  const totalPages = Math.ceil(total / pageSize);
+  const pageNum = Math.max(1, Math.min(page, totalPages));
+  const startIndex = (pageNum - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedLogs = webhookLogs.slice(startIndex, endIndex);
+
+  return {
+    logs: paginatedLogs,
+    total,
+    page: pageNum,
+    pageSize,
+    totalPages,
+    hasMore: pageNum < totalPages,
+  };
+}
+
 export function clearWebhookLogs(): void {
   webhookLogs.length = 0;
 }

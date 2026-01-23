@@ -17,18 +17,50 @@ interface WebhookLog {
   body: any;
 }
 
+interface PaginationMeta {
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasMore: boolean;
+}
+
 export default function LogsPage() {
   const [logs, setLogs] = useState<WebhookLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLog, setSelectedLog] = useState<WebhookLog | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [refreshInterval, setRefreshInterval] = useState(5000); // 5 seconds default
+  const [usePagination, setUsePagination] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [paginationMeta, setPaginationMeta] = useState<PaginationMeta | null>(null);
 
   const fetchLogs = useCallback(async () => {
     try {
-      const response = await fetch("/api/logs");
+      const url = usePagination
+        ? `/api/logs?paginate=true&page=${currentPage}&pageSize=${pageSize}`
+        : "/api/logs";
+      const response = await fetch(url);
       const data = await response.json();
-      setLogs(data.logs || []);
+      
+      if (usePagination && data.logs) {
+        // Paginated response
+        setLogs(data.logs || []);
+        setPaginationMeta({
+          total: data.total,
+          page: data.page,
+          pageSize: data.pageSize,
+          totalPages: data.totalPages,
+          hasMore: data.hasMore,
+        });
+      } else {
+        // Non-paginated response (backward compatibility)
+        setLogs(data.logs || []);
+        setPaginationMeta(null);
+      }
+      
       setSelectedLog((prev) => {
         if (data.logs && data.logs.length > 0 && !prev) {
           return data.logs[0];
@@ -40,7 +72,7 @@ export default function LogsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [usePagination, currentPage, pageSize]);
 
   const clearLogs = async () => {
     if (confirm("Are you sure you want to clear all logs?")) {
@@ -108,10 +140,10 @@ export default function LogsPage() {
 
     const interval = setInterval(() => {
       fetchLogs();
-    }, 2000);
+    }, refreshInterval);
 
     return () => clearInterval(interval);
-  }, [autoRefresh, fetchLogs]);
+  }, [autoRefresh, refreshInterval, fetchLogs]);
 
   const getStatusColor = (statusCode: number) => {
     if (statusCode >= 200 && statusCode < 300) return "bg-green-100 text-green-800 border-green-200";
@@ -190,7 +222,31 @@ export default function LogsPage() {
                     : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                 }`}
               >
-                {autoRefresh ? "🔄 Auto-refresh ON" : "⏸ Auto-refresh OFF"}
+                {autoRefresh ? `🔄 Auto-refresh (${refreshInterval / 1000}s)` : "⏸ Auto-refresh OFF"}
+              </button>
+              <select
+                value={refreshInterval}
+                onChange={(e) => setRefreshInterval(Number(e.target.value))}
+                className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={!autoRefresh}
+              >
+                <option value={2000}>2s (Fast)</option>
+                <option value={5000}>5s (Default)</option>
+                <option value={10000}>10s (Slow)</option>
+                <option value={30000}>30s (Very Slow)</option>
+              </select>
+              <button
+                onClick={() => {
+                  setUsePagination(!usePagination);
+                  setCurrentPage(1); // Reset to first page when toggling
+                }}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer ${
+                  usePagination
+                    ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                {usePagination ? "📄 Paginated" : "📋 All Logs"}
               </button>
               <button
                 onClick={fetchLogs}
@@ -263,7 +319,9 @@ export default function LogsPage() {
                 <h2 className="text-sm font-semibold text-slate-900">
                   Requests
                   <span className="ml-1.5 text-xs font-normal text-slate-500">
-                    ({filteredLogs.length} {filteredLogs.length !== logs.length && `of ${logs.length}`})
+                    {paginationMeta
+                      ? `(Page ${paginationMeta.page} of ${paginationMeta.totalPages}, ${paginationMeta.total} total)`
+                      : `(${filteredLogs.length} ${filteredLogs.length !== logs.length ? `of ${logs.length}` : ""})`}
                   </span>
                 </h2>
               </div>
@@ -331,6 +389,59 @@ export default function LogsPage() {
                   </div>
                 )}
               </div>
+              {/* Pagination Controls */}
+              {usePagination && paginationMeta && paginationMeta.totalPages > 1 && (
+                <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-600">Page size:</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => {
+                        setPageSize(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="px-2 py-1 border border-slate-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="px-2 py-1 text-xs border border-slate-300 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      ««
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="px-2 py-1 text-xs border border-slate-300 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      ‹ Prev
+                    </button>
+                    <span className="text-xs text-slate-600 px-2">
+                      Page {paginationMeta.page} of {paginationMeta.totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage(Math.min(paginationMeta.totalPages, currentPage + 1))}
+                      disabled={!paginationMeta.hasMore}
+                      className="px-2 py-1 text-xs border border-slate-300 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next ›
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(paginationMeta.totalPages)}
+                      disabled={!paginationMeta.hasMore}
+                      className="px-2 py-1 text-xs border border-slate-300 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      »»
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Details Panel */}

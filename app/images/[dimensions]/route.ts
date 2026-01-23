@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { escapeXml, sanitizeColor, sanitizeText } from "@/lib/xss";
+import { createHash } from "crypto";
 
 // CSS color names to hex mapping
 const cssColorNames: Record<string, string> = {
@@ -204,11 +205,29 @@ export async function GET(
   // Generate SVG placeholder
   const svg = generatePlaceholderSVG(width, height, bgColorNormalized, textColorNormalized, text);
 
+  // Generate ETag for cache validation
+  const etag = createHash("md5").update(svg).digest("hex");
+  const etagHeader = `"${etag}"`;
+
+  // Check if client has cached version
+  const ifNoneMatch = request.headers.get("if-none-match");
+  if (ifNoneMatch === etagHeader) {
+    return new NextResponse(null, {
+      status: 304, // Not Modified
+      headers: {
+        "ETag": etagHeader,
+        "Cache-Control": "public, max-age=31536000, immutable",
+      },
+    });
+  }
+
   return new NextResponse(svg, {
     status: 200,
     headers: {
       "Content-Type": "image/svg+xml",
       "Cache-Control": "public, max-age=31536000, immutable",
+      "ETag": etagHeader,
+      "Vary": "Accept",
     },
   });
 }

@@ -458,6 +458,17 @@ GET /images/600x400?bg=darkblue&textColor=lightblue
 - Invalid status codes (outside 100-599) will default to `200`
 - Status code must be a valid integer
 
+## Performance
+
+The service includes several performance optimizations:
+
+- **Pagination:** Load logs in pages (default: 50 per page) for faster performance
+- **Configurable Refresh:** Adjustable auto-refresh interval (2s, 5s, 10s, 30s)
+- **SVG Caching:** Enhanced caching with ETag support for placeholder images
+- **Efficient Storage:** In-memory storage for fast access (up to 1,000 logs)
+
+For detailed performance information, see [PERFORMANCE.md](./PERFORMANCE.md).
+
 ## Support
 
 For issues or questions, please contact the development team or create an issue in the repository.
