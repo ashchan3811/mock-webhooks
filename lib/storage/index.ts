@@ -3,6 +3,7 @@
  */
 import { IStorage } from "./interface";
 import { MemoryStorage } from "./memory";
+import { TursoStorage } from "./turso";
 
 // Determine which storage to use based on environment
 const STORAGE_TYPE = process.env.STORAGE_TYPE || "memory";
@@ -14,11 +15,14 @@ export function getStorage(): IStorage {
     return storageInstance;
   }
 
-  switch (STORAGE_TYPE) {
+  switch (STORAGE_TYPE.toLowerCase()) {
     case "memory":
       storageInstance = new MemoryStorage();
       break;
-    // Future: Add database implementations here
+    case "turso":
+      storageInstance = new TursoStorage();
+      break;
+    // Future: Add more database implementations here
     // case "postgres":
     //   storageInstance = new PostgresStorage();
     //   break;
@@ -26,6 +30,7 @@ export function getStorage(): IStorage {
     //   storageInstance = new MongoStorage();
     //   break;
     default:
+      console.warn(`Unknown storage type: ${STORAGE_TYPE}, falling back to memory`);
       storageInstance = new MemoryStorage();
   }
 

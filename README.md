@@ -412,12 +412,16 @@ GET /images/600x400?bg=darkblue&textColor=lightblue
    npm install
    ```
 
-3. Run the development server:
+3. (Optional) Set up Turso for persistent storage:
+   - See [TURSO_SETUP.md](./TURSO_SETUP.md) for detailed instructions
+   - Or use in-memory storage (default, no setup required)
+
+4. Run the development server:
    ```bash
    npm run dev
    ```
 
-4. Open [http://localhost:3000](http://localhost:3000)
+5. Open [http://localhost:3000](http://localhost:3000)
 
 ### Environment
 
@@ -492,9 +496,11 @@ For complete feature documentation, see [FEATURES.md](./FEATURES.md).
 ### 💾 Storage Abstraction
 Storage layer abstraction supporting:
 - In-memory storage (default)
-- Ready for database integration (PostgreSQL, MongoDB, etc.)
+- **Turso** - SQLite-compatible serverless database (production-ready)
+- Ready for additional database integration (PostgreSQL, MongoDB, etc.)
 
 See [FEATURES.md](./FEATURES.md#1-persistent-storage-optional-database) for details.
+See [TURSO_SETUP.md](./TURSO_SETUP.md) for Turso setup instructions.
 
 ## Support
 

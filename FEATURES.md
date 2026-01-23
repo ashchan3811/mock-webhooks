@@ -9,17 +9,37 @@ The application now supports a storage abstraction layer that allows switching b
 
 ### Current Implementation
 - **Default:** In-memory storage (fast, no setup required)
-- **Future:** Database support (PostgreSQL, MongoDB, etc.)
+- **Turso:** SQLite-compatible serverless database (production-ready)
+- **Future:** Additional database support (PostgreSQL, MongoDB, etc.)
 
 ### Configuration
 
 ```env
-# Storage type: "memory" (default) or future database types
+# Storage type: "memory" (default) or "turso"
 STORAGE_TYPE=memory
 
-# Maximum logs to store (in-memory only)
+# Maximum logs to store (applies to both memory and turso)
 MAX_LOGS=1000
+
+# Turso configuration (required if STORAGE_TYPE=turso)
+TURSO_DATABASE_URL=libsql://your-database-url.turso.io
+TURSO_AUTH_TOKEN=your-auth-token-here
 ```
+
+### Turso Setup
+
+Turso is a serverless, edge-ready SQLite-compatible database. See [TURSO_SETUP.md](./TURSO_SETUP.md) for complete setup instructions.
+
+**Quick Start:**
+1. Create a Turso database at [turso.tech](https://turso.tech)
+2. Get your database URL and auth token
+3. Set environment variables:
+   ```env
+   STORAGE_TYPE=turso
+   TURSO_DATABASE_URL=libsql://...
+   TURSO_AUTH_TOKEN=...
+   ```
+4. The schema is automatically created on first use
 
 ### Storage Interface
 
@@ -37,9 +57,19 @@ interface IStorage {
 }
 ```
 
+### Turso Implementation
+
+Turso storage is fully implemented and ready to use. See `lib/storage/turso.ts` for the implementation.
+
+**Features:**
+- Automatic schema creation
+- Optimized indexes for performance
+- Automatic log cleanup (when MAX_LOGS is set)
+- Full support for all storage operations
+
 ### Future Database Support
 
-To add database support, implement the `IStorage` interface:
+To add additional database support, implement the `IStorage` interface:
 
 ```typescript
 // Example: lib/storage/postgres.ts
