@@ -11,6 +11,7 @@ import {
   SECURITY_CONFIG,
 } from "@/lib/security";
 import { validateApiKey, getAuthErrorResponse } from "@/lib/auth";
+import { extractWebhookIdFromPath } from "@/lib/webhooks";
 
 export async function GET(
   request: NextRequest,
@@ -105,6 +106,9 @@ async function handleWebhook(
     const path = slug && slug.length > 0 
       ? `/webhooks/${slug.join("/")}` 
       : "/webhooks";
+
+    // Extract webhook_id from path if present
+    const webhookId = extractWebhookIdFromPath(path);
 
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
@@ -253,6 +257,7 @@ async function handleWebhook(
       headers,
       queryParams,
       body,
+      webhookId: webhookId || undefined,
     });
 
     const response: any = {

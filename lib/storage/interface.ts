@@ -6,8 +6,8 @@ import { WebhookLog } from "../store";
 
 export interface IStorage {
   addLog(log: WebhookLog): Promise<void>;
-  getLogs(): Promise<WebhookLog[]>;
-  getLogsPaginated(page: number, pageSize: number): Promise<{
+  getLogs(webhookId?: string): Promise<WebhookLog[]>;
+  getLogsPaginated(page: number, pageSize: number, webhookId?: string): Promise<{
     logs: WebhookLog[];
     total: number;
     page: number;
@@ -17,8 +17,8 @@ export interface IStorage {
   }>;
   getLogById(id: string): Promise<WebhookLog | undefined>;
   deleteLog(id: string): Promise<boolean>;
-  clearLogs(): Promise<void>;
-  getStats(): Promise<StorageStats>;
+  clearLogs(webhookId?: string): Promise<void>;
+  getStats(webhookId?: string): Promise<StorageStats>;
 }
 
 export interface StorageStats {

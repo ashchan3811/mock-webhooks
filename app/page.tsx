@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import WebhookManager from "./components/WebhookManager";
 
 interface WebhookLog {
   id: string;
@@ -36,12 +37,19 @@ export default function LogsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [paginationMeta, setPaginationMeta] = useState<PaginationMeta | null>(null);
+  const [selectedWebhookId, setSelectedWebhookId] = useState<string | null>(null);
+  const [hasWebhooks, setHasWebhooks] = useState(false);
 
   const fetchLogs = useCallback(async () => {
     try {
-      const url = usePagination
+      let url = usePagination
         ? `/api/logs?paginate=true&page=${currentPage}&pageSize=${pageSize}`
         : "/api/logs";
+      
+      if (selectedWebhookId) {
+        url += usePagination ? `&webhookId=${selectedWebhookId}` : `?webhookId=${selectedWebhookId}`;
+      }
+      
       const response = await fetch(url);
       if (!response.ok) {
         if (response.status === 401) {
@@ -78,7 +86,7 @@ export default function LogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [usePagination, currentPage, pageSize]);
+  }, [usePagination, currentPage, pageSize, selectedWebhookId]);
 
   const clearLogs = async () => {
     if (confirm("Are you sure you want to clear all logs?")) {
@@ -228,8 +236,16 @@ export default function LogsPage() {
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100">
       <div className="max-w-8xl mx-auto p-6">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mb-6">
+        {/* Webhook Manager */}
+        <WebhookManager
+          selectedWebhookId={selectedWebhookId}
+          onWebhookSelect={setSelectedWebhookId}
+          onWebhooksChange={(webhooks) => setHasWebhooks(webhooks.length > 0)}
+        />
+
+        {/* Header - Only show if webhooks exist */}
+        {hasWebhooks && (
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mb-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <div className="flex items-center gap-3">
@@ -242,8 +258,18 @@ export default function LogsPage() {
                 </a>
               </div>
               <p className="text-sm text-slate-500 mt-1">
-                Monitor all incoming webhook requests in real-time
+                {selectedWebhookId
+                  ? `Showing logs for selected webhook`
+                  : "Monitor all incoming webhook requests in real-time"}
               </p>
+              {selectedWebhookId && (
+                <button
+                  onClick={() => setSelectedWebhookId(null)}
+                  className="mt-2 px-3 py-1 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 text-sm"
+                >
+                  Show All Logs
+                </button>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -307,9 +333,18 @@ export default function LogsPage() {
               />
             </div>
           )}
-        </div>
+          </div>
+        )}
 
-        {loading ? (
+        {!hasWebhooks ? (
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-12 text-center">
+            <div className="text-6xl mb-4">🔗</div>
+            <h2 className="text-xl font-semibold text-slate-900 mb-2">Create Your First Webhook</h2>
+            <p className="text-slate-500 mb-4">
+              Create a webhook above to start receiving and viewing webhook requests
+            </p>
+          </div>
+        ) : loading ? (
           <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-12 text-center">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <p className="mt-4 text-slate-600">Loading logs...</p>

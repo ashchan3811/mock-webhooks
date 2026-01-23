@@ -49,6 +49,7 @@ export class TursoStorage implements IStorage {
           headers TEXT NOT NULL,
           query_params TEXT NOT NULL,
           body TEXT,
+          webhook_id TEXT,
           created_at TEXT DEFAULT (datetime('now'))
         )
       `);
@@ -74,6 +75,11 @@ export class TursoStorage implements IStorage {
         ON webhook_logs(path)
       `);
 
+      await this.client.execute(`
+        CREATE INDEX IF NOT EXISTS idx_webhook_logs_webhook_id 
+        ON webhook_logs(webhook_id)
+      `);
+
       this.initialized = true;
     } catch (error) {
       console.error("Error initializing Turso database:", error);
@@ -89,8 +95,8 @@ export class TursoStorage implements IStorage {
         sql: `
           INSERT INTO webhook_logs (
             id, timestamp, method, path, url, status_code, timeout,
-            start_time, end_time, headers, query_params, body
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            start_time, end_time, headers, query_params, body, webhook_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         args: [
           log.id,
@@ -105,6 +111,7 @@ export class TursoStorage implements IStorage {
           JSON.stringify(log.headers),
           JSON.stringify(log.queryParams),
           log.body !== null ? JSON.stringify(log.body) : null,
+          log.webhookId || null,
         ],
       });
 
@@ -129,20 +136,26 @@ export class TursoStorage implements IStorage {
     }
   }
 
-  async getLogs(): Promise<WebhookLog[]> {
+  async getLogs(webhookId?: string): Promise<WebhookLog[]> {
     await this.ensureInitialized();
 
     try {
-      const result = await this.client.execute({
-        sql: `
-          SELECT 
-            id, timestamp, method, path, url, status_code, timeout,
-            start_time, end_time, headers, query_params, body
-          FROM webhook_logs
-          ORDER BY timestamp DESC
-        `,
-        args: [],
-      });
+      let sql = `
+        SELECT 
+          id, timestamp, method, path, url, status_code, timeout,
+          start_time, end_time, headers, query_params, body, webhook_id
+        FROM webhook_logs
+      `;
+      const args: any[] = [];
+
+      if (webhookId) {
+        sql += ` WHERE webhook_id = ?`;
+        args.push(webhookId);
+      }
+
+      sql += ` ORDER BY timestamp DESC`;
+
+      const result = await this.client.execute({ sql, args });
 
       return result.rows.map((row) => this.rowToLog(row));
     } catch (error) {
@@ -153,7 +166,8 @@ export class TursoStorage implements IStorage {
 
   async getLogsPaginated(
     page: number = 1,
-    pageSize: number = 50
+    pageSize: number = 50,
+    webhookId?: string
   ): Promise<{
     logs: WebhookLog[];
     total: number;
@@ -166,9 +180,17 @@ export class TursoStorage implements IStorage {
 
     try {
       // Get total count
+      let countSql = "SELECT COUNT(*) as total FROM webhook_logs";
+      const countArgs: any[] = [];
+      
+      if (webhookId) {
+        countSql += " WHERE webhook_id = ?";
+        countArgs.push(webhookId);
+      }
+
       const countResult = await this.client.execute({
-        sql: "SELECT COUNT(*) as total FROM webhook_logs",
-        args: [],
+        sql: countSql,
+        args: countArgs,
       });
       const total = (countResult.rows[0]?.total as number) || 0;
 
@@ -178,17 +200,23 @@ export class TursoStorage implements IStorage {
       const offset = (pageNum - 1) * pageSize;
 
       // Get paginated logs
-      const result = await this.client.execute({
-        sql: `
-          SELECT 
-            id, timestamp, method, path, url, status_code, timeout,
-            start_time, end_time, headers, query_params, body
-          FROM webhook_logs
-          ORDER BY timestamp DESC
-          LIMIT ? OFFSET ?
-        `,
-        args: [pageSize, offset],
-      });
+      let sql = `
+        SELECT 
+          id, timestamp, method, path, url, status_code, timeout,
+          start_time, end_time, headers, query_params, body, webhook_id
+        FROM webhook_logs
+      `;
+      const args: any[] = [];
+
+      if (webhookId) {
+        sql += ` WHERE webhook_id = ?`;
+        args.push(webhookId);
+      }
+
+      sql += ` ORDER BY timestamp DESC LIMIT ? OFFSET ?`;
+      args.push(pageSize, offset);
+
+      const result = await this.client.execute({ sql, args });
 
       const logs = result.rows.map((row) => this.rowToLog(row));
 
@@ -214,7 +242,7 @@ export class TursoStorage implements IStorage {
         sql: `
           SELECT 
             id, timestamp, method, path, url, status_code, timeout,
-            start_time, end_time, headers, query_params, body
+            start_time, end_time, headers, query_params, body, webhook_id
           FROM webhook_logs
           WHERE id = ?
         `,
@@ -248,18 +276,25 @@ export class TursoStorage implements IStorage {
     }
   }
 
-  async clearLogs(): Promise<void> {
+  async clearLogs(webhookId?: string): Promise<void> {
     await this.ensureInitialized();
 
     try {
-      await this.client.execute("DELETE FROM webhook_logs");
+      if (webhookId) {
+        await this.client.execute({
+          sql: "DELETE FROM webhook_logs WHERE webhook_id = ?",
+          args: [webhookId],
+        });
+      } else {
+        await this.client.execute("DELETE FROM webhook_logs");
+      }
     } catch (error) {
       console.error("Error clearing logs from Turso:", error);
       throw error;
     }
   }
 
-  async getStats(): Promise<StorageStats> {
+  async getStats(webhookId?: string): Promise<StorageStats> {
     await this.ensureInitialized();
 
     try {
@@ -269,20 +304,37 @@ export class TursoStorage implements IStorage {
       const lastMinute = new Date(now - 60 * 1000).toISOString();
 
       // Get total count
+      let countSql = "SELECT COUNT(*) as total FROM webhook_logs";
+      const countArgs: any[] = [];
+      
+      if (webhookId) {
+        countSql += " WHERE webhook_id = ?";
+        countArgs.push(webhookId);
+      }
+
       const totalResult = await this.client.execute({
-        sql: "SELECT COUNT(*) as total FROM webhook_logs",
-        args: [],
+        sql: countSql,
+        args: countArgs,
       });
       const totalLogs = Number(totalResult.rows[0]?.total) || 0;
 
       // Get counts by method
+      let methodSql = `
+        SELECT method, COUNT(*) as count
+        FROM webhook_logs
+      `;
+      const methodArgs: any[] = [];
+      
+      if (webhookId) {
+        methodSql += " WHERE webhook_id = ?";
+        methodArgs.push(webhookId);
+      }
+      
+      methodSql += " GROUP BY method";
+
       const methodResult = await this.client.execute({
-        sql: `
-          SELECT method, COUNT(*) as count
-          FROM webhook_logs
-          GROUP BY method
-        `,
-        args: [],
+        sql: methodSql,
+        args: methodArgs,
       });
       const logsByMethod: Record<string, number> = {};
       for (const row of methodResult.rows) {
@@ -290,15 +342,24 @@ export class TursoStorage implements IStorage {
       }
 
       // Get counts by status code (grouped by 100s)
+      let statusSql = `
+        SELECT 
+          CAST(status_code / 100 AS TEXT) || 'xx' as status_group,
+          COUNT(*) as count
+        FROM webhook_logs
+      `;
+      const statusArgs: any[] = [];
+      
+      if (webhookId) {
+        statusSql += " WHERE webhook_id = ?";
+        statusArgs.push(webhookId);
+      }
+      
+      statusSql += " GROUP BY status_group";
+
       const statusResult = await this.client.execute({
-        sql: `
-          SELECT 
-            CAST(status_code / 100 AS TEXT) || 'xx' as status_group,
-            COUNT(*) as count
-          FROM webhook_logs
-          GROUP BY status_group
-        `,
-        args: [],
+        sql: statusSql,
+        args: statusArgs,
       });
       const logsByStatus: Record<string, number> = {};
       for (const row of statusResult.rows) {
@@ -306,13 +367,22 @@ export class TursoStorage implements IStorage {
       }
 
       // Get counts by path
+      let pathSql = `
+        SELECT path, COUNT(*) as count
+        FROM webhook_logs
+      `;
+      const pathArgs: any[] = [];
+      
+      if (webhookId) {
+        pathSql += " WHERE webhook_id = ?";
+        pathArgs.push(webhookId);
+      }
+      
+      pathSql += " GROUP BY path";
+
       const pathResult = await this.client.execute({
-        sql: `
-          SELECT path, COUNT(*) as count
-          FROM webhook_logs
-          GROUP BY path
-        `,
-        args: [],
+        sql: pathSql,
+        args: pathArgs,
       });
       const logsByPath: Record<string, number> = {};
       for (const row of pathResult.rows) {
@@ -320,33 +390,39 @@ export class TursoStorage implements IStorage {
       }
 
       // Get recent activity counts
+      let recent24hSql = "SELECT COUNT(*) as count FROM webhook_logs WHERE timestamp >= ?";
+      const recent24hArgs: any[] = [last24Hours];
+      if (webhookId) {
+        recent24hSql = "SELECT COUNT(*) as count FROM webhook_logs WHERE webhook_id = ? AND timestamp >= ?";
+        recent24hArgs.unshift(webhookId);
+      }
       const recent24hResult = await this.client.execute({
-        sql: `
-          SELECT COUNT(*) as count
-          FROM webhook_logs
-          WHERE timestamp >= ?
-        `,
-        args: [last24Hours],
+        sql: recent24hSql,
+        args: recent24hArgs,
       });
       const last24HoursCount = Number(recent24hResult.rows[0]?.count) || 0;
 
+      let recentHourSql = "SELECT COUNT(*) as count FROM webhook_logs WHERE timestamp >= ?";
+      const recentHourArgs: any[] = [lastHour];
+      if (webhookId) {
+        recentHourSql = "SELECT COUNT(*) as count FROM webhook_logs WHERE webhook_id = ? AND timestamp >= ?";
+        recentHourArgs.unshift(webhookId);
+      }
       const recentHourResult = await this.client.execute({
-        sql: `
-          SELECT COUNT(*) as count
-          FROM webhook_logs
-          WHERE timestamp >= ?
-        `,
-        args: [lastHour],
+        sql: recentHourSql,
+        args: recentHourArgs,
       });
       const lastHourCount = Number(recentHourResult.rows[0]?.count) || 0;
 
+      let recentMinuteSql = "SELECT COUNT(*) as count FROM webhook_logs WHERE timestamp >= ?";
+      const recentMinuteArgs: any[] = [lastMinute];
+      if (webhookId) {
+        recentMinuteSql = "SELECT COUNT(*) as count FROM webhook_logs WHERE webhook_id = ? AND timestamp >= ?";
+        recentMinuteArgs.unshift(webhookId);
+      }
       const recentMinuteResult = await this.client.execute({
-        sql: `
-          SELECT COUNT(*) as count
-          FROM webhook_logs
-          WHERE timestamp >= ?
-        `,
-        args: [lastMinute],
+        sql: recentMinuteSql,
+        args: recentMinuteArgs,
       });
       const lastMinuteCount = Number(recentMinuteResult.rows[0]?.count) || 0;
 
@@ -384,6 +460,7 @@ export class TursoStorage implements IStorage {
       headers: JSON.parse(row.headers as string),
       queryParams: JSON.parse(row.query_params as string),
       body: row.body ? JSON.parse(row.body as string) : null,
+      webhookId: row.webhook_id ? (row.webhook_id as string) : undefined,
     };
   }
 }

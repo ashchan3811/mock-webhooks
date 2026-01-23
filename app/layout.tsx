@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import SessionInitializer from "./components/SessionInitializer";
 
 export const metadata: Metadata = {
   title: "Mock Webhook API",
@@ -13,7 +14,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <SessionInitializer />
+        {children}
+      </body>
     </html>
   );
 }

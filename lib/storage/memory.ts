@@ -17,13 +17,17 @@ export class MemoryStorage implements IStorage {
     }
   }
 
-  async getLogs(): Promise<WebhookLog[]> {
+  async getLogs(webhookId?: string): Promise<WebhookLog[]> {
+    if (webhookId) {
+      return webhookLogs.filter(log => log.webhookId === webhookId);
+    }
     return [...webhookLogs]; // Return copy to prevent mutation
   }
 
   async getLogsPaginated(
     page: number = 1,
-    pageSize: number = 50
+    pageSize: number = 50,
+    webhookId?: string
   ): Promise<{
     logs: WebhookLog[];
     total: number;
@@ -32,12 +36,16 @@ export class MemoryStorage implements IStorage {
     totalPages: number;
     hasMore: boolean;
   }> {
-    const total = webhookLogs.length;
+    const filteredLogs = webhookId 
+      ? webhookLogs.filter(log => log.webhookId === webhookId)
+      : webhookLogs;
+    
+    const total = filteredLogs.length;
     const totalPages = Math.ceil(total / pageSize);
     const pageNum = Math.max(1, Math.min(page, totalPages));
     const startIndex = (pageNum - 1) * pageSize;
     const endIndex = startIndex + pageSize;
-    const paginatedLogs = webhookLogs.slice(startIndex, endIndex);
+    const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
 
     return {
       logs: [...paginatedLogs],
@@ -62,15 +70,28 @@ export class MemoryStorage implements IStorage {
     return false;
   }
 
-  async clearLogs(): Promise<void> {
-    webhookLogs.length = 0;
+  async clearLogs(webhookId?: string): Promise<void> {
+    if (webhookId) {
+      const index = webhookLogs.length;
+      for (let i = index - 1; i >= 0; i--) {
+        if (webhookLogs[i].webhookId === webhookId) {
+          webhookLogs.splice(i, 1);
+        }
+      }
+    } else {
+      webhookLogs.length = 0;
+    }
   }
 
-  async getStats(): Promise<StorageStats> {
+  async getStats(webhookId?: string): Promise<StorageStats> {
     const now = Date.now();
     const last24Hours = now - 24 * 60 * 60 * 1000;
     const lastHour = now - 60 * 60 * 1000;
     const lastMinute = now - 60 * 1000;
+
+    const filteredLogs = webhookId 
+      ? webhookLogs.filter(log => log.webhookId === webhookId)
+      : webhookLogs;
 
     const logsByMethod: Record<string, number> = {};
     const logsByStatus: Record<string, number> = {};
@@ -79,7 +100,7 @@ export class MemoryStorage implements IStorage {
     let lastHourCount = 0;
     let lastMinuteCount = 0;
 
-    for (const log of webhookLogs) {
+    for (const log of filteredLogs) {
       // Count by method
       logsByMethod[log.method] = (logsByMethod[log.method] || 0) + 1;
       
@@ -98,7 +119,7 @@ export class MemoryStorage implements IStorage {
     }
 
     return {
-      totalLogs: webhookLogs.length,
+      totalLogs: filteredLogs.length,
       logsByMethod,
       logsByStatus,
       logsByPath,

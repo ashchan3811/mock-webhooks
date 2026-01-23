@@ -11,6 +11,7 @@ export interface WebhookLog {
   headers: Record<string, string>;
   queryParams: Record<string, string>;
   body: any;
+  webhookId?: string; // Optional webhook ID for session-based webhooks
 }
 
 // Re-export storage functions for backward compatibility
@@ -22,14 +23,15 @@ export async function addWebhookLog(log: WebhookLog): Promise<void> {
   await storage.addLog(log);
 }
 
-export async function getWebhookLogs(): Promise<WebhookLog[]> {
+export async function getWebhookLogs(webhookId?: string): Promise<WebhookLog[]> {
   const storage = getStorage();
-  return await storage.getLogs();
+  return await storage.getLogs(webhookId);
 }
 
 export async function getWebhookLogsPaginated(
   page: number = 1,
-  pageSize: number = 50
+  pageSize: number = 50,
+  webhookId?: string
 ): Promise<{
   logs: WebhookLog[];
   total: number;
@@ -39,7 +41,7 @@ export async function getWebhookLogsPaginated(
   hasMore: boolean;
 }> {
   const storage = getStorage();
-  return await storage.getLogsPaginated(page, pageSize);
+  return await storage.getLogsPaginated(page, pageSize, webhookId);
 }
 
 export async function clearWebhookLogs(): Promise<void> {

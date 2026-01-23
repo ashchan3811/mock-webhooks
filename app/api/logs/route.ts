@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
   const pageParam = searchParams.get("page");
   const pageSizeParam = searchParams.get("pageSize");
   const usePagination = searchParams.get("paginate") === "true";
+  const webhookId = searchParams.get("webhookId") || undefined;
 
   // If pagination is requested, return paginated results
   if (usePagination) {
@@ -27,12 +28,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const result = await getWebhookLogsPaginated(page, pageSize);
+    const result = await getWebhookLogsPaginated(page, pageSize, webhookId);
     return NextResponse.json(result);
   }
 
   // Default: return all logs (for backward compatibility)
-  const logs = await getWebhookLogs();
+  const logs = await getWebhookLogs(webhookId);
   return NextResponse.json({ logs });
 }
 
