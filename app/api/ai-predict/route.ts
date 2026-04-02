@@ -1,0 +1,178 @@
+import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
+
+const FALLBACK_RT = "TBD by Facilities Expert";
+const DEFAULT_CONFIDENCE_THRESHOLD = 0.6;
+
+const REQUEST_TYPE_KEYWORDS: { rt: string; keywords: string[] }[] = [
+  {
+    rt: "ELEVATOR - ISSUE",
+    keywords: ["elevator", "lift", "stuck", "floor", "door won't open", "elevator button", "cab"],
+  },
+  {
+    rt: "PLUMBING - ISSUE",
+    keywords: ["water", "leak", "pipe", "drain", "toilet", "sink", "flood", "tap", "faucet", "sewage", "clog", "blocked drain"],
+  },
+  {
+    rt: "ELECTRICAL - ISSUE",
+    keywords: ["light", "power", "outlet", "socket", "breaker", "electric", "flicker", "no power", "blown fuse", "wiring", "switch"],
+  },
+  {
+    rt: "HVAC - ISSUE",
+    keywords: ["air", "hvac", "heating", "cooling", "ac", "ventilation", "temperature", "hot", "cold", "thermostat", "vent", "air conditioning"],
+  },
+  {
+    rt: "CLEANING - REQUEST",
+    keywords: ["clean", "dirty", "spill", "trash", "garbage", "mess", "waste", "mop", "sweep", "sanitize", "odor", "smell"],
+  },
+  {
+    rt: "SECURITY - ISSUE",
+    keywords: ["security", "lock", "key", "access", "badge", "door", "intruder", "camera", "alarm", "unauthorized", "card reader"],
+  },
+  {
+    rt: "CARPENTRY - REPAIR",
+    keywords: ["door", "window", "cabinet", "shelf", "furniture", "broken", "hinge", "handle", "frame", "wood", "repair", "crack"],
+  },
+  {
+    rt: "PAINTING - REQUEST",
+    keywords: ["paint", "wall", "ceiling", "peeling", "stain", "graffiti", "repaint", "discolored", "faded"],
+  },
+];
+
+const REQUEST_TYPES = REQUEST_TYPE_KEYWORDS.map((r) => r.rt);
+
+/**
+ * Returns matched request types ranked by keyword hit count.
+ * Each match also carries a raw score (hits / total keywords) used to
+ * nudge the confidence value toward something believable.
+ */
+function fuzzyMatch(description: string): { rt: string; score: number }[] {
+  const normalized = description.toLowerCase();
+  const scores = REQUEST_TYPE_KEYWORDS.map(({ rt, keywords }) => {
+    const hits = keywords.filter((kw) => normalized.includes(kw)).length;
+    return { rt, score: hits / keywords.length };
+  }).filter((r) => r.score > 0);
+
+  return scores.sort((a, b) => b.score - a.score);
+}
+
+interface AiPredictRequest {
+  problem_description?: string;
+  confidence_threshold?: number;
+}
+
+function randomFloat(min: number, max: number, decimals = 5): number {
+  return parseFloat((Math.random() * (max - min) + min).toFixed(decimals));
+}
+
+function pickRandom<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+const PROCESSING_DELAY_MS = { min: 5000, max: 10000 };
+const TIMEOUT_DELAY_MS = 29000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function newRequestId(): string {
+  return randomUUID().replace(/-/g, "").substring(0, 32);
+}
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  let body: AiPredictRequest = {};
+  try {
+    const text = await request.text();
+    if (text) body = JSON.parse(text);
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON in request body" }, { status: 400 });
+  }
+
+  const threshold =
+    typeof body.confidence_threshold === "number" &&
+    body.confidence_threshold > 0 &&
+    body.confidence_threshold < 1
+      ? body.confidence_threshold
+      : DEFAULT_CONFIDENCE_THRESHOLD;
+
+  const roll = Math.random();
+
+  // Resolve predicted RT and confidence nudge from description (if provided)
+  const matches = body.problem_description ? fuzzyMatch(body.problem_description) : [];
+  const topMatch = matches[0];
+  const predictedRt = topMatch ? topMatch.rt : pickRandom(REQUEST_TYPES);
+
+  // Timeout scenario: wait 29s then respond
+  if (roll >= 0.90 && roll < 0.97) {
+    await sleep(TIMEOUT_DELAY_MS);
+    return NextResponse.json(
+      {
+        status: "timeout",
+        predicted_rt: FALLBACK_RT,
+        request_id: newRequestId(),
+        message: "AI Model timed out before a Request Type could be predicted. Defaulting to fallback Request Type",
+        error_code: "TIMEOUT",
+      },
+      { status: 504 },
+    );
+  }
+
+  // All other scenarios: simulate real AI processing delay (5–10s)
+  const processingDelay = randomFloat(PROCESSING_DELAY_MS.min, PROCESSING_DELAY_MS.max, 0);
+  await sleep(processingDelay);
+
+  // 55% success
+  if (roll < 0.55) {
+    // Nudge confidence higher when description strongly matched
+    const confidenceMin = topMatch
+      ? Math.min(threshold + topMatch.score * (0.99 - threshold), 0.98)
+      : threshold;
+    return NextResponse.json({
+      status: "success",
+      predicted_rt: predictedRt,
+      confidence: randomFloat(confidenceMin, 0.99),
+      request_id: newRequestId(),
+    });
+  }
+
+  // 20% low_confidence
+  if (roll < 0.75) {
+    const confidence = randomFloat(0.01, threshold - 0.001);
+    return NextResponse.json(
+      {
+        status: "low_confidence",
+        predicted_rt: predictedRt,
+        confidence,
+        request_id: newRequestId(),
+        message: `Confidence ${(confidence * 100).toFixed(1)}% is below threshold ${(threshold * 100).toFixed(0)}%. Human review required`,
+        error_code: "LOW_CONFIDENCE",
+      },
+      { status: 422 },
+    );
+  }
+
+  // 15% multiple_rts — use top two fuzzy matches if available, else random
+  if (roll < 0.90) {
+    const detected =
+      matches.length >= 2
+        ? [matches[0].rt, matches[1].rt]
+        : Array.from(new Set([pickRandom(REQUEST_TYPES), pickRandom(REQUEST_TYPES)]));
+    return NextResponse.json(
+      {
+        status: "multiple_rts",
+        predicted_rt: FALLBACK_RT,
+        request_id: newRequestId(),
+        message: `Multiple request types detected: ${detected.join(", ")}. Only one issue can be submitted per request`,
+        error_code: "MULTIPLE_RTS",
+      },
+      { status: 422 },
+    );
+  }
+
+  // 3% network_error
+  return NextResponse.json(
+    { error: "Network error: Unable to connect to AI service" },
+    { status: 503 },
+  );
+}
