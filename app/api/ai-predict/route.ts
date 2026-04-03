@@ -1,43 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import { REQUEST_TYPE_KEYWORDS } from "@/lib/constant";
 
 const FALLBACK_RT = "TBD by Facilities Expert";
 const DEFAULT_CONFIDENCE_THRESHOLD = 0.6;
-
-const REQUEST_TYPE_KEYWORDS: { rt: string; keywords: string[] }[] = [
-  {
-    rt: "ELEVATOR - ISSUE",
-    keywords: ["elevator", "lift", "stuck", "floor", "door won't open", "elevator button", "cab"],
-  },
-  {
-    rt: "PLUMBING - ISSUE",
-    keywords: ["water", "leak", "pipe", "drain", "toilet", "sink", "flood", "tap", "faucet", "sewage", "clog", "blocked drain"],
-  },
-  {
-    rt: "ELECTRICAL - ISSUE",
-    keywords: ["light", "power", "outlet", "socket", "breaker", "electric", "flicker", "no power", "blown fuse", "wiring", "switch"],
-  },
-  {
-    rt: "HVAC - ISSUE",
-    keywords: ["air", "hvac", "heating", "cooling", "ac", "ventilation", "temperature", "hot", "cold", "thermostat", "vent", "air conditioning"],
-  },
-  {
-    rt: "CLEANING - REQUEST",
-    keywords: ["clean", "dirty", "spill", "trash", "garbage", "mess", "waste", "mop", "sweep", "sanitize", "odor", "smell"],
-  },
-  {
-    rt: "SECURITY - ISSUE",
-    keywords: ["security", "lock", "key", "access", "badge", "door", "intruder", "camera", "alarm", "unauthorized", "card reader"],
-  },
-  {
-    rt: "CARPENTRY - REPAIR",
-    keywords: ["door", "window", "cabinet", "shelf", "furniture", "broken", "hinge", "handle", "frame", "wood", "repair", "crack"],
-  },
-  {
-    rt: "PAINTING - REQUEST",
-    keywords: ["paint", "wall", "ceiling", "peeling", "stain", "graffiti", "repaint", "discolored", "faded"],
-  },
-];
 
 const REQUEST_TYPES = REQUEST_TYPE_KEYWORDS.map((r) => r.rt);
 
@@ -86,7 +52,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const text = await request.text();
     if (text) body = JSON.parse(text);
   } catch {
-    return NextResponse.json({ error: "Invalid JSON in request body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid JSON in request body" },
+      { status: 400 }
+    );
   }
 
   const threshold =
@@ -99,27 +68,34 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const roll = Math.random();
 
   // Resolve predicted RT and confidence nudge from description (if provided)
-  const matches = body.problem_description ? fuzzyMatch(body.problem_description) : [];
+  const matches = body.problem_description
+    ? fuzzyMatch(body.problem_description)
+    : [];
   const topMatch = matches[0];
   const predictedRt = topMatch ? topMatch.rt : pickRandom(REQUEST_TYPES);
 
   // Timeout scenario: wait 29s then respond
-  if (roll >= 0.90 && roll < 0.97) {
+  if (roll >= 0.9 && roll < 0.97) {
     await sleep(TIMEOUT_DELAY_MS);
     return NextResponse.json(
       {
         status: "timeout",
         predicted_rt: FALLBACK_RT,
         request_id: newRequestId(),
-        message: "AI Model timed out before a Request Type could be predicted. Defaulting to fallback Request Type",
+        message:
+          "AI Model timed out before a Request Type could be predicted. Defaulting to fallback Request Type",
         error_code: "TIMEOUT",
       },
-      { status: 504 },
+      { status: 504 }
     );
   }
 
   // All other scenarios: simulate real AI processing delay (5–10s)
-  const processingDelay = randomFloat(PROCESSING_DELAY_MS.min, PROCESSING_DELAY_MS.max, 0);
+  const processingDelay = randomFloat(
+    PROCESSING_DELAY_MS.min,
+    PROCESSING_DELAY_MS.max,
+    0
+  );
   await sleep(processingDelay);
 
   // 55% success
@@ -145,34 +121,42 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         predicted_rt: predictedRt,
         confidence,
         request_id: newRequestId(),
-        message: `Confidence ${(confidence * 100).toFixed(1)}% is below threshold ${(threshold * 100).toFixed(0)}%. Human review required`,
+        message: `Confidence ${(confidence * 100).toFixed(
+          1
+        )}% is below threshold ${(threshold * 100).toFixed(
+          0
+        )}%. Human review required`,
         error_code: "LOW_CONFIDENCE",
       },
-      { status: 422 },
+      { status: 422 }
     );
   }
 
   // 15% multiple_rts — use top two fuzzy matches if available, else random
-  if (roll < 0.90) {
+  if (roll < 0.9) {
     const detected =
       matches.length >= 2
         ? [matches[0].rt, matches[1].rt]
-        : Array.from(new Set([pickRandom(REQUEST_TYPES), pickRandom(REQUEST_TYPES)]));
+        : Array.from(
+            new Set([pickRandom(REQUEST_TYPES), pickRandom(REQUEST_TYPES)])
+          );
     return NextResponse.json(
       {
         status: "multiple_rts",
         predicted_rt: FALLBACK_RT,
         request_id: newRequestId(),
-        message: `Multiple request types detected: ${detected.join(", ")}. Only one issue can be submitted per request`,
+        message: `Multiple request types detected: ${detected.join(
+          ", "
+        )}. Only one issue can be submitted per request`,
         error_code: "MULTIPLE_RTS",
       },
-      { status: 422 },
+      { status: 422 }
     );
   }
 
   // 3% network_error
   return NextResponse.json(
     { error: "Network error: Unable to connect to AI service" },
-    { status: 503 },
+    { status: 503 }
   );
 }
