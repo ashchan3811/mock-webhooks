@@ -35,7 +35,7 @@ function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-const PROCESSING_DELAY_MS = { min: 5000, max: 10000 };
+const PROCESSING_DELAY_MS = { min: 1000, max: 10000 };
 const TIMEOUT_DELAY_MS = 29000;
 
 function sleep(ms: number): Promise<void> {
