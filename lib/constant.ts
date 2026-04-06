@@ -509,6 +509,10 @@ export const REQUEST_TYPE_KEYWORDS: { rt: string; keywords: string[] }[] = [
   {
     rt: "CLEANING - ENTIRE",
     keywords: [
+      "clean",
+      "cleaning",
+      "dirty",
+      "mess",
       "full cleaning",
       "clean entire",
       "complete cleaning",
@@ -934,12 +938,16 @@ export const REQUEST_TYPE_KEYWORDS: { rt: string; keywords: string[] }[] = [
   {
     rt: "ELECTRICAL - REPAIR",
     keywords: [
+      "electrical",
+      "wiring",
       "electrical repair",
       "fix electrical",
       "electrical broken",
       "electrical not working",
       "electrical fault repair",
       "wiring broken",
+      "electric fault",
+      "electrical problem",
     ],
   },
   {
@@ -961,6 +969,8 @@ export const REQUEST_TYPE_KEYWORDS: { rt: string; keywords: string[] }[] = [
   {
     rt: "ELEVATORS - COMMON - REPAIRS",
     keywords: [
+      "elevator",
+      "lift",
       "elevator repair",
       "lift repair",
       "common elevator broken",
@@ -968,12 +978,19 @@ export const REQUEST_TYPE_KEYWORDS: { rt: string; keywords: string[] }[] = [
       "elevator maintenance",
       "lift broken",
       "common lift repair",
+      "elevator noise",
+      "elevator sound",
+      "noisy elevator",
+      "elevator vibrating",
+      "elevator shaking",
+      "elevator loud",
     ],
   },
   {
     rt: "ELEVATORS - TENANT - EMERG/STUCK",
     keywords: [
       "elevator stuck",
+      "stuck elevator",
       "lift stuck",
       "stuck in elevator",
       "stuck in lift",
@@ -982,11 +999,14 @@ export const REQUEST_TYPE_KEYWORDS: { rt: string; keywords: string[] }[] = [
       "trapped in elevator",
       "elevator not moving",
       "person stuck elevator",
+      "elevator doors won't open",
+      "elevator not opening",
     ],
   },
   {
     rt: "ELEVATORS - TENANT - REPAIRS",
     keywords: [
+      "tenant elevator",
       "tenant elevator repair",
       "tenant lift repair",
       "office elevator broken",

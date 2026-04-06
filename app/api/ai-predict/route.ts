@@ -15,8 +15,20 @@ const REQUEST_TYPES = REQUEST_TYPE_KEYWORDS.map((r) => r.rt);
 function fuzzyMatch(description: string): { rt: string; score: number }[] {
   const normalized = description.toLowerCase();
   const scores = REQUEST_TYPE_KEYWORDS.map(({ rt, keywords }) => {
-    const hits = keywords.filter((kw) => normalized.includes(kw)).length;
-    return { rt, score: hits / keywords.length };
+    // Sort keywords longest-first so more specific phrases score higher than
+    // their component words when both appear in the description.
+    const sorted = [...keywords].sort((a, b) => b.length - a.length);
+    let hits = 0;
+    let remaining = normalized;
+    for (const kw of sorted) {
+      if (remaining.includes(kw)) {
+        // Weight longer/more-specific keywords more heavily
+        hits += kw.split(" ").length;
+        // Consume matched text so a phrase doesn't double-count its words
+        remaining = remaining.replace(kw, "");
+      }
+    }
+    return { rt, score: hits };
   }).filter((r) => r.score > 0);
 
   return scores.sort((a, b) => b.score - a.score);
