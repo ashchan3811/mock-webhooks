@@ -86,6 +86,58 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const topMatch = matches[0];
   const predictedRt = topMatch ? topMatch.rt : pickRandom(REQUEST_TYPES);
 
+  // Comma-separated description → always return multiple_rts
+  const segments = body.problem_description
+    ? body.problem_description
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+
+  if (segments.length >= 2) {
+    const segmentRts: string[] = [];
+    for (const segment of segments) {
+      const segMatches = fuzzyMatch(segment);
+      if (segMatches.length > 0) {
+        const rt = segMatches[0].rt;
+        if (!segmentRts.includes(rt)) segmentRts.push(rt);
+      }
+    }
+
+    // Ensure at least 2 distinct RTs to show in the message
+    let detected: string[];
+    if (segmentRts.length >= 2) {
+      detected = segmentRts;
+    } else if (matches.length >= 2) {
+      detected = [matches[0].rt, matches[1].rt];
+    } else {
+      const fallback = pickRandom(
+        REQUEST_TYPES.filter((r) => r !== (segmentRts[0] ?? ""))
+      );
+      detected = [segmentRts[0] ?? pickRandom(REQUEST_TYPES), fallback];
+    }
+
+    const processingDelay = randomFloat(
+      PROCESSING_DELAY_MS.min,
+      PROCESSING_DELAY_MS.max,
+      0
+    );
+    await sleep(processingDelay);
+
+    return NextResponse.json(
+      {
+        status: "multiple_rts",
+        predicted_rt: FALLBACK_RT,
+        request_id: newRequestId(),
+        message: `Multiple request types detected: ${detected.join(
+          ", "
+        )}. Only one issue can be submitted per request`,
+        error_code: "MULTIPLE_RTS",
+      },
+      { status: 422 }
+    );
+  }
+
   // Timeout scenario: wait 29s then respond
   if (roll >= 0.9 && roll < 0.97) {
     await sleep(TIMEOUT_DELAY_MS);
