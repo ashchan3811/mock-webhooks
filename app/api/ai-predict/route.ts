@@ -138,6 +138,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // Description contains "timeout" → always return timeout
+  if (body.problem_description?.toLowerCase().includes("timeout")) {
+    await sleep(TIMEOUT_DELAY_MS);
+    return NextResponse.json(
+      {
+        status: "timeout",
+        predicted_rt: FALLBACK_RT,
+        request_id: newRequestId(),
+        message:
+          "AI Model timed out before a Request Type could be predicted. Defaulting to fallback Request Type",
+        error_code: "TIMEOUT",
+      },
+      { status: 504 }
+    );
+  }
+
   // Timeout scenario: wait 29s then respond
   if (roll >= 0.9 && roll < 0.97) {
     await sleep(TIMEOUT_DELAY_MS);
